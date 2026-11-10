@@ -24,6 +24,11 @@ on:
         description: "Required SHA-256 when data_seed_url is supplied"
         type: string
 
+      build_userdata:
+        description: "Also build userdata-root.img (needs about 16 GB of disk)"
+        type: boolean
+        default: false
+
 permissions:
   contents: read
 
@@ -162,3 +167,62 @@ jobs:
             UniXNU/out/sheng/*/*/payload/payload.img
             UniXNU/out/sheng/*/*/kernel/kernel.macho
             UniXNU/out/sheng/*/*/package.manifest.json
+      - name: userdata layout
+        if: inputs.build_userdata && success()
+        env:
+          UNIXNU_DEVICE: ${{ github.workspace }}/device
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ./UniXNU/unixnu build userdata --dry-run
+          df -h "$GITHUB_WORKSPACE"
+      - name: userdata image
+        if: inputs.build_userdata && success()
+        env:
+          UNIXNU_DEVICE: ${{ github.workspace }}/device
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ./UniXNU/unixnu build userdata
+          df -h "$GITHUB_WORKSPACE"
+      - name: userdata artifact
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img
+            UniXNU/out/sheng/*/*/userdata/userdata-root.json
+      - name: build logs
+        if: always()
+        env:
+          SEED: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, shutil
+          root = pathlib.Path('UniXNU/out/sheng')
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'build-logs'
+          shutil.rmtree(dest, ignore_errors=True)
+          dest.mkdir(parents=True, exist_ok=True)
+          seed = os.environ.get('SEED') or ''
+          count = 0
+          for path in sorted(root.glob('*/*/logs/*.log')) if root.is_dir() else []:
+              data = path.read_bytes()
+              if b'\0' in data:
+                  continue
+              text = data.decode('utf-8', 'replace')
+              if seed:
+                  text = text.replace(seed, '***')
+              text = re.sub(r'https?://[^\s"\']*[?&](?:token|sig|signature|key|X-Amz-Signature)=[^\s"\']*', '***', text, flags=re.I)
+              (dest / path.name).write_text(text, encoding='utf-8')
+              count += 1
+          print(f'{count} text logs staged from {root}')
+          PY
+      - name: build logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ inputs.os }}
+          retention-days: 3
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/build-logs/*.log
