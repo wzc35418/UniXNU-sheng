@@ -47,7 +47,12 @@ for name, expected in firmware_manifest.items():
         raise SystemExit("WCN7850 firmware differs from manifest: " + name)
     (out / 'firmware' / name).write_bytes(data)
 if missing_firmware:
-    print("wifi: firmware blobs absent, packaging the addon without them: " + ", ".join(sorted(missing_firmware)))
+    print("wifi: firmware blobs absent, skipped the addon: " + ", ".join(sorted(missing_firmware)))
+    for name in ("bin", "etc/wifi", "daemons"):
+        (out / name).mkdir(parents=True, exist_ok=True)
+    (out / "report.json").write_text(json.dumps(
+        {"skipped": "device firmware blobs absent", "missing": sorted(missing_firmware)}, indent=2) + "\n")
+    sys.exit(0)
 # Unattended testing only: UNIXNU_WIFI_JOIN names a local file (network name on the first line, key on the second) that goes to the
 # firmware directory as join.txt; with the kernel argument wifi-aj=1 the board joins that network by itself (WifiNet.cpp autoJoin).
 # Never set for a release: the file holds a network key.
