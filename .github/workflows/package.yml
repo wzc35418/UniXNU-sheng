@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: wzc35418/UniXNU
-          ref: 1249e781ccf5045f5dfab57365b6d657628ce3ce # Wi-Fi runtime and Data firmware integration
+          ref: 3fd05b9f3ea0e31f415551a8868ef7df6db5ce3a # Wi-Fi runtime and Data firmware integration
           path: UniXNU
           submodules: recursive
       - uses: actions/checkout@v4
