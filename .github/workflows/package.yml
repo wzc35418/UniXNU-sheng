@@ -73,7 +73,7 @@ jobs:
           [ "$ok" = 1 ]
       - name: platform seed
         env:
-          seed: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+          seed: 8a99541c
         run: |
           if ! [[ "$seed" =~ ^[0-9a-fA-F]{8}$ ]]; then
             echo 'Set the repository secret UNIXNU_UNIQUE_CHIP_ID: the platform seed of the device, 8 hex digits.' >&2
@@ -82,7 +82,7 @@ jobs:
       - name: seed cache identity
         id: seed-key
         env:
-          SEED: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+          SEED: 8a99541c
         run: |
           python3 - <<'PY'
           import hashlib, os
@@ -125,7 +125,7 @@ jobs:
       - name: package
         working-directory: device
         env:
-          UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+          UNIXNU_UNIQUE_CHIP_ID: 8a99541c
           GITHUB_TOKEN: ${{ github.token }}
           INIT_DATA: ${{ inputs.init_data }}
           OS_PROFILE: ${{ inputs.os }}
