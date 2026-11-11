@@ -132,6 +132,21 @@ jobs:
         run: |
           python3 scripts/extract-files.py
           ls -l .cache/firmware/nanosic .cache/firmware/novatek
+      - name: ipsw cache identity
+        id: ipsw-key
+        env:
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, os
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('key=ipsw-v1-' + hashlib.sha256((os.environ.get('OS_PROFILE') or '27').encode()).hexdigest()[:16] + '\n')
+          PY
+      - uses: actions/cache/restore@v4
+        id: ipsw-cache
+        with:
+          path: UniXNU/out/ipsw
+          key: ${{ steps.ipsw-key.outputs.key }}
       - name: package
         working-directory: device
         env:
@@ -224,6 +239,15 @@ jobs:
           print(f'{count} text logs staged from {root}')
           PY
       - name: build logs artifact
+      - uses: actions/cache/save@v4
+        if: always() && steps.ipsw-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/ipsw/**') != ''
+        with:
+          path: UniXNU/out/ipsw
+          key: ${{ steps.ipsw-key.outputs.key }}
+      - name: disk usage
+        if: always()
+        run: |
+          du -sh UniXNU/out/ipsw UniXNU/out/sheng device/.cache 2>/dev/null || true
         if: always()
         uses: actions/upload-artifact@v4
         with:
