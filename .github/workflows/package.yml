@@ -216,54 +216,9 @@ jobs:
             echo "  $seed_command"
             eval "$seed_command"
           elif grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
-            echo 'the build needs signed root policies the repository does not ship; generating them:'
-            policy_env=$(python3 - <<'PY' | grep '^POLICIES_ENV=' | tail -n 1
-import json
-import re
-import subprocess
-import sys
-from pathlib import Path
-
-log = Path('/tmp/unixnu-build.log').read_text(errors='ignore')
-hits = re.findall(r'policies/([A-Za-z0-9._-]+)/([A-Za-z]+)/trusted-key\.bin', log)
-if not hits:
-    sys.exit('no policy path in the log')
-profile = hits[-1][0]
-unixnu = (Path('..') / 'UniXNU').resolve()
-tree = next((unixnu / 'out/sheng').glob('*/tree'), None)
-if tree is None or not tree.is_dir():
-    sys.exit('no staged tree')
-policies = Path('scripts/policies') / profile
-ipsw_root = unixnu / 'out/ipsw'
-windows, chosen = [], []
-for name in ('OS', 'SystemOS', 'App'):
-    meta_path = policies / name / 'verification.json'
-    if not meta_path.is_file():
-        continue
-    meta = json.loads(meta_path.read_text())
-    size = meta.get('image_bytes')
-    image = None
-    for candidate in ipsw_root.rglob('*'):
-        if candidate.is_file() and candidate.stat().st_size == size:
-            image = candidate
-            break
-    volume = meta.get('volume_uuid')
-    if image is not None and volume:
-        windows.append(f'{name}={image}:{volume}')
-        chosen.append(name)
-if not windows:
-    sys.exit('no window matched an extracted image')
-output = tree / 'scripts/policies' / profile
-command = [sys.executable, str(tree / 'scripts/make-root-policies.py'),
-           '--tree', str(tree), '--output', str(output)]
-for window in windows:
-    command += ['--window', window]
-print('running:', ' '.join(command))
-subprocess.run(command, check=True)
-print('POLICIES_ENV=' + ','.join(chosen))
-PY
-)
-            export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env#POLICIES_ENV=}"
+            echo 'generating the signed root policies the repository does not ship:'
+            policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log)
+            export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
             echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
           else
             exit 1
