@@ -239,6 +239,13 @@ jobs:
           print(f'{count} text logs staged from {root}')
           PY
       - name: build logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ inputs.os }}
+          retention-days: 3
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/build-logs/*.log
       - uses: actions/cache/save@v4
         if: always() && steps.ipsw-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/ipsw/**') != ''
         with:
@@ -248,10 +255,3 @@ jobs:
         if: always()
         run: |
           du -sh UniXNU/out/ipsw UniXNU/out/sheng device/.cache 2>/dev/null || true
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-${{ inputs.os }}
-          retention-days: 3
-          if-no-files-found: warn
-          path: ${{ runner.temp }}/build-logs/*.log
