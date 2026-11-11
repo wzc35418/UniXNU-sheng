@@ -217,7 +217,7 @@ jobs:
             eval "$seed_command"
           elif grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
             echo 'generating the signed root policies the repository does not ship:'
-            policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log)
+            policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
             export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
             echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
           else
