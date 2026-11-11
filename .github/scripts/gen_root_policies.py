@@ -6,6 +6,9 @@ and manifest.bin. No branch commits those binaries for macos-27.3-26C5035r, so d
 the extracted IPSW images: each window's verification.json records the image size and the volume
 UUID that the kernel mounts.
 
+The generator is run from the UniXNU checkout (not from the staged tree), so its ROOT-relative
+kit lookup finds kits/VerifiedRoot; --tree still points at the staged tree for build outputs.
+
 Usage: gen_root_policies.py [BUILD_LOG]
 Prints the UNIXNU_SOURCE_STORAGE_POLICIES value on stdout.
 """
@@ -14,6 +17,15 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+def find_tree(unixnu):
+    root = unixnu / 'out/sheng'
+    if not root.is_dir():
+        return None
+    # out/sheng/<profile>/<config>/tree
+    candidates = sorted(root.glob('*/*/tree')) + sorted(root.glob('*/tree'))
+    return next((path for path in candidates if path.is_dir()), None)
 
 
 def main():
@@ -25,9 +37,15 @@ def main():
     profile = hits[-1][0]
 
     unixnu = (Path('..') / 'UniXNU').resolve()
-    tree = next((unixnu / 'out/sheng').glob('*/tree'), None)
-    if tree is None or not tree.is_dir():
-        raise SystemExit('no staged build tree')
+    tree = find_tree(unixnu)
+    if tree is None:
+        raise SystemExit('no staged build tree under out/sheng')
+
+    generator = unixnu / 'scripts/make-root-policies.py'
+    if not generator.is_file():
+        generator = tree / 'scripts/make-root-policies.py'
+    if not generator.is_file():
+        raise SystemExit('make-root-policies.py not found')
 
     policies = Path('scripts/policies') / profile
     ipsw_root = unixnu / 'out/ipsw'
@@ -52,11 +70,11 @@ def main():
         raise SystemExit('no window matched an extracted image')
 
     output = tree / 'scripts/policies' / profile
-    command = [sys.executable, str(tree / 'scripts/make-root-policies.py'),
+    command = [sys.executable, str(generator),
                '--tree', str(tree), '--output', str(output)]
     for window in windows:
         command += ['--window', window]
-    print(' '.join(command), file=sys.stderr)
+    print('running: ' + ' '.join(command), file=sys.stderr)
     subprocess.run(command, check=True)
     print(','.join(chosen))
 
