@@ -188,6 +188,36 @@ jobs:
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
           key: ${{ steps.macos-seed-key.outputs.key }}
+      - name: widen the adreno bridge build timeout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('UniXNU/scripts/build-adreno-metal-bridge.py')
+          if not p.is_file():
+              raise SystemExit('build-adreno-metal-bridge.py not found')
+          text = p.read_text()
+          new = re.sub(r'timeout=1800\b', 'timeout=5400', text)
+          if new != text:
+              p.write_text(new)
+              print('timeout raised to 5400s')
+          else:
+              print('timeout already 5400s or changed layout')
+          PY
+      - name: cargo cache identity
+        id: cargo-key
+        env:
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          echo "key=cargo-v1-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: cargo-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            UniXNU/out/sheng/*/*/tree/build/adreno-metal-bridge/target
+          key: ${{ steps.cargo-key.outputs.key }}
       - name: package
         working-directory: device
         env:
@@ -339,3 +369,12 @@ jobs:
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
           key: ${{ steps.macos-seed-key.outputs.key }}
+      - uses: actions/cache/save@v4
+        if: always() && steps.cargo-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            UniXNU/out/sheng/*/*/tree/build/adreno-metal-bridge/target
+          key: ${{ steps.cargo-key.outputs.key }}
