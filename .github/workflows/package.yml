@@ -200,24 +200,76 @@ jobs:
           if [ "$OS_PROFILE" = 27 ] && [ "$INIT_DATA" = true ]; then
             args+=(--init-data)
           fi
-          set +e
-          scripts/package.sh "${args[@]}" 2>&1 | tee /tmp/unixnu-build.log
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -ne 0 ]; then
-            # The macOS profile has no --init-data path: its first-install Data seed keeps
-            # APFS owners, so the driver refuses to create it and prints the exact sudo
-            # command instead. Run that command, then build again.
-            seed_command=$(grep -o 'sudo python3 .*make-macos-data-seed\.py .*' /tmp/unixnu-build.log | head -n 1)
-            if [ -n "$seed_command" ]; then
-              echo 'the driver asked for a first-install Data seed; running:'
-              echo "  $seed_command"
-              eval "$seed_command"
-              scripts/package.sh "${args[@]}"
-            else
-              exit "$status"
-            fi
+          run_build() {
+            set +e
+            scripts/package.sh "${args[@]}" 2>&1 | tee /tmp/unixnu-build.log
+            local status=${PIPESTATUS[0]}
+            set -e
+            return $status
+          }
+          if run_build; then
+            exit 0
           fi
+          seed_command=$(grep -o 'sudo python3 .*make-macos-data-seed\.py .*' /tmp/unixnu-build.log | head -n 1)
+          if [ -n "$seed_command" ]; then
+            echo 'the driver asked for a first-install Data seed; running:'
+            echo "  $seed_command"
+            eval "$seed_command"
+          elif grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
+            echo 'the build needs signed root policies the repository does not ship; generating them:'
+            policy_env=$(python3 - <<'PY' | grep '^POLICIES_ENV=' | tail -n 1
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+log = Path('/tmp/unixnu-build.log').read_text(errors='ignore')
+hits = re.findall(r'policies/([A-Za-z0-9._-]+)/([A-Za-z]+)/trusted-key\.bin', log)
+if not hits:
+    sys.exit('no policy path in the log')
+profile = hits[-1][0]
+unixnu = (Path('..') / 'UniXNU').resolve()
+tree = next((unixnu / 'out/sheng').glob('*/tree'), None)
+if tree is None or not tree.is_dir():
+    sys.exit('no staged tree')
+policies = Path('scripts/policies') / profile
+ipsw_root = unixnu / 'out/ipsw'
+windows, chosen = [], []
+for name in ('OS', 'SystemOS', 'App'):
+    meta_path = policies / name / 'verification.json'
+    if not meta_path.is_file():
+        continue
+    meta = json.loads(meta_path.read_text())
+    size = meta.get('image_bytes')
+    image = None
+    for candidate in ipsw_root.rglob('*'):
+        if candidate.is_file() and candidate.stat().st_size == size:
+            image = candidate
+            break
+    volume = meta.get('volume_uuid')
+    if image is not None and volume:
+        windows.append(f'{name}={image}:{volume}')
+        chosen.append(name)
+if not windows:
+    sys.exit('no window matched an extracted image')
+output = tree / 'scripts/policies' / profile
+command = [sys.executable, str(tree / 'scripts/make-root-policies.py'),
+           '--tree', str(tree), '--output', str(output)]
+for window in windows:
+    command += ['--window', window]
+print('running:', ' '.join(command))
+subprocess.run(command, check=True)
+print('POLICIES_ENV=' + ','.join(chosen))
+PY
+)
+            export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env#POLICIES_ENV=}"
+            echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
+          else
+            exit 1
+          fi
+          run_build
+
       - uses: actions/cache/save@v4
         if: always() && inputs.os == '27' && steps.data-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr') != ''
         with:
