@@ -93,7 +93,10 @@ def main():
     if not windows:
         raise SystemExit('no window matched an extracted image')
 
-    output = tree / 'scripts/policies' / profile
+    # Write into the device repository so the next tree staging copies the new records too: the
+    # driver re-assembles the tree before every build and would otherwise restore the repository's
+    # original verification.json, whose trusted_key_sha256 names a different owner key.
+    output = Path('scripts/policies') / profile
     command = [sys.executable, str(generator),
                '--tree', str(tree), '--output', str(output)]
     for window in windows:
@@ -114,6 +117,11 @@ def main():
                 table.write_bytes(keep + bundle[544:])
         else:
             table.write_bytes(keep)
+    for name in chosen:
+        record = json.loads((output / name / 'verification.json').read_text())
+        print(f"{name}: image_sha256={record.get('image_sha256')} "
+              f"volume={record.get('volume_uuid')} blocks={record.get('blocks_verified')} "
+              f"real_c={record.get('real_c_signature_and_block_verification')}", file=sys.stderr)
     print(','.join(chosen))
 
 
