@@ -127,6 +127,11 @@ jobs:
           if not path.is_file() and os.environ['INIT_DATA'] != 'true':
               raise SystemExit('No saved seed. Supply the ORIGINAL seed for an existing installation, or select init_data for a FIRST installation')
           PY
+      - name: pinned proprietary firmware
+        working-directory: device
+        run: |
+          python3 scripts/extract-files.py
+          ls -l .cache/firmware/nanosic .cache/firmware/novatek
       - name: package
         working-directory: device
         env:
