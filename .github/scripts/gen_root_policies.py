@@ -75,7 +75,7 @@ def main():
     for window in windows:
         command += ['--window', window]
     print('running: ' + ' '.join(command), file=sys.stderr)
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, stdout=sys.stderr, stderr=sys.stderr)
     print(','.join(chosen))
 
 
