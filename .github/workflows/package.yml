@@ -175,6 +175,19 @@ jobs:
           else
             echo 'no cached IPSW members; the run downloads them'
           fi
+      - name: macos seed cache identity
+        id: macos-seed-key
+        env:
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          echo "key=seed-v1-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: macos-seed-cache
+        with:
+          path: |
+            UniXNU/out/sheng/*/*/runtime/data.dbr
+            UniXNU/out/sheng/*/*/runtime/inputs.json
+          key: ${{ steps.macos-seed-key.outputs.key }}
       - name: package
         working-directory: device
         env:
@@ -312,10 +325,10 @@ jobs:
         if: always()
         run: du -sh UniXNU/out/ipsw UniXNU/out/sheng device/.cache 2>/dev/null || true
       - uses: actions/cache/save@v4
-        if: always() && steps.seed-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/*/*/runtime/data.dbr') != ''
+        if: always() && steps.macos-seed-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/*/*/runtime/data.dbr') != ''
         continue-on-error: true
         with:
           path: |
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
-          key: ${{ steps.seed-cache-key.outputs.key }}
+          key: ${{ steps.macos-seed-key.outputs.key }}
