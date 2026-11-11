@@ -132,27 +132,24 @@ jobs:
         run: |
           python3 scripts/extract-files.py
           ls -l .cache/firmware/nanosic .cache/firmware/novatek
-      - name: normalize ath12k sparse paths
+      - name: patch ath12k fetch-sources
         run: |
           python3 - <<'PY'
-          import json, pathlib
-          p = pathlib.Path('device/drivers/Ath12kWifi/tools/source-lock.json')
-          if p.is_file():
-              data = json.loads(p.read_text())
-              changed = []
-              for name, source in data.items():
-                  if isinstance(source, dict) and isinstance(source.get('paths'), list):
-                      fixed = [value.strip('/') for value in source['paths']]
-                      if fixed != source['paths']:
-                          source['paths'] = fixed
-                          changed.append(name)
-              if changed:
-                  p.write_text(json.dumps(data, indent=2) + '\n')
-                  print('normalized sparse paths for: ' + ', '.join(changed))
-              else:
-                  print('sparse paths already normalized')
+          from pathlib import Path
+          p = Path('device/drivers/Ath12kWifi/tools/fetch-sources.py')
+          if not p.is_file():
+              print('no fetch-sources.py, skip')
+              raise SystemExit(0)
+          text = p.read_text()
+          old = 'subprocess.run(["git", "-C", str(directory), "sparse-checkout", "add", *source["paths"]], check=True)'
+          new = 'subprocess.run(["git", "-C", str(directory), "sparse-checkout", "set", "--no-cone", *paths], check=True)'
+          if old in text:
+              p.write_text(text.replace(old, new))
+              print('patched fetch-sources.py: sparse-checkout set --no-cone with normalized paths')
+          elif new in text:
+              print('fetch-sources.py already patched')
           else:
-              print('no source-lock.json, skip')
+              print('fetch-sources.py layout changed; inspect manually')
           PY
       - name: ipsw cache identity
         id: ipsw-key
