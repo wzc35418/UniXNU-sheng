@@ -211,7 +211,7 @@ CI_ENABLE_METAL_GPU = "0"
 ["os_overrides"."macos-27.3-26C5035r"."payload"]
 # The macOS kernel collection (137 MiB), the Data seed (20 MiB) and the GPU addon (the Metal plugin and Turnip, zlib-compressed).
 # iPadOS 17 and 26 images boot on this device with 208 MiB.
-"size_mib" = 200
+"size_mib" = 180
 # GPU as on iPadOS 27: fb-bgra=1 renders in system memory with transient attachments in GMEM (Turnip patches), fb-gpu=1 hands the
 # compositor's frames to the render server's GPU copy when the display cannot scan them out directly (dpu-scanout=2).
 # macOS: storage, display, HID, USB, CPU, GPU, audio (with the battery on the ADSP), and en0 (ShengEthernet), which carries the Wi-Fi module. Bluetooth is not enabled yet; AppSync
