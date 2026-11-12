@@ -309,16 +309,18 @@ jobs:
         env:
           UNIXNU_DEVICE: ${{ github.workspace }}/device
           GITHUB_TOKEN: ${{ github.token }}
+          OS_PROFILE: ${{ inputs.os }}
         run: |
-          ./UniXNU/unixnu build userdata --dry-run
+          ./UniXNU/unixnu build userdata --os "$OS_PROFILE" --dry-run
           df -h "$GITHUB_WORKSPACE"
       - name: userdata image
         if: inputs.build_userdata && success()
         env:
           UNIXNU_DEVICE: ${{ github.workspace }}/device
           GITHUB_TOKEN: ${{ github.token }}
+          OS_PROFILE: ${{ inputs.os }}
         run: |
-          ./UniXNU/unixnu build userdata
+          ./UniXNU/unixnu build userdata --os "$OS_PROFILE"
           df -h "$GITHUB_WORKSPACE"
       - name: split the userdata image below the artifact limit
         if: inputs.build_userdata && success()
@@ -342,6 +344,7 @@ jobs:
           path: |
             UniXNU/out/sheng/*/*/userdata/userdata-root.img.000
             UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+            UniXNU/out/sheng/*/*/userdata/userdata-root.json
       - name: userdata artifact part 001
         if: inputs.build_userdata && success()
         uses: actions/upload-artifact@v4
