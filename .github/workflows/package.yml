@@ -92,7 +92,7 @@ jobs:
           python3 - <<'PY'
           import hashlib, os
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write('key=data-seed-v1-' + hashlib.sha256(os.environ['SEED'].encode()).hexdigest()[:16] + '\n')
+              out.write('key=data-seed-v2-' + hashlib.sha256(os.environ['SEED'].encode()).hexdigest()[:16] + '\n')
           PY
       - uses: actions/cache/restore@v4
         id: data-cache
@@ -180,7 +180,7 @@ jobs:
         env:
           OS_PROFILE: ${{ inputs.os }}
         run: |
-          echo "key=seed-v1-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
+          echo "key=seed-v2-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         id: macos-seed-cache
         with:
@@ -188,6 +188,18 @@ jobs:
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
           key: ${{ steps.macos-seed-key.outputs.key }}
+      - name: point the UFS root window at the macOS partition
+        working-directory: device
+        run: |
+          set -e
+          f=drivers/ShengUfs/RootLayout.h
+          test -f "$f" || { echo "missing $f"; exit 1; }
+          if grep -q 'wanted\[\] = "linux";' "$f"; then
+            echo 'already retargeted'
+          else
+            sed -i 's/wanted\[\] = "userdata";/wanted[] = "linux";/' "$f"
+          fi
+          grep -n 'static const char wanted' "$f"
       - name: widen the adreno bridge build timeout
         run: |
           python3 - <<'PY'
