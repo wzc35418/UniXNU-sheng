@@ -311,7 +311,18 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           OS_PROFILE: ${{ inputs.os }}
         run: |
-          ./UniXNU/unixnu build userdata --os "$OS_PROFILE" --dry-run
+          set -e
+          tree=$(ls -d UniXNU/out/sheng/"$OS_PROFILE"/*/tree | head -n 1)
+          echo "tree: $tree"
+          args=(--os "$OS_PROFILE")
+          for window in OS SystemOS App; do
+            table="$tree/build/verified-root-$window/hashes.bin"
+            if [ -f "$table" ]; then
+              echo "object $window.vroot <- $table ($(stat -f%z "$table") bytes)"
+              args+=(--object "$window.vroot=$table")
+            fi
+          done
+          ./UniXNU/unixnu build userdata "${args[@]}" --dry-run
           df -h "$GITHUB_WORKSPACE"
       - name: userdata image
         if: inputs.build_userdata && success()
@@ -320,7 +331,16 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           OS_PROFILE: ${{ inputs.os }}
         run: |
-          ./UniXNU/unixnu build userdata --os "$OS_PROFILE"
+          set -e
+          tree=$(ls -d UniXNU/out/sheng/"$OS_PROFILE"/*/tree | head -n 1)
+          args=(--os "$OS_PROFILE")
+          for window in OS SystemOS App; do
+            table="$tree/build/verified-root-$window/hashes.bin"
+            if [ -f "$table" ]; then
+              args+=(--object "$window.vroot=$table")
+            fi
+          done
+          ./UniXNU/unixnu build userdata "${args[@]}"
           df -h "$GITHUB_WORKSPACE"
       - name: split the userdata image below the artifact limit
         if: inputs.build_userdata && success()
