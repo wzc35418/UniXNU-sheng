@@ -250,23 +250,31 @@ jobs:
             set -e
             return $status
           }
-          if run_build; then
-            exit 0
-          fi
-          seed_command=$(grep -o 'sudo python3 .*make-macos-data-seed\.py .*' /tmp/unixnu-build.log | head -n 1)
-          if [ -n "$seed_command" ]; then
-            echo 'the driver asked for a first-install Data seed; running:'
-            echo "  $seed_command"
-            eval "$seed_command"
-          elif grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
-            echo 'generating the signed root policies the repository does not ship:'
-            policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
-            export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
-            echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
-          else
-            exit 1
-          fi
-          run_build
+          for attempt in 1 2 3; do
+            if run_build; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo 'three attempts used; giving up'
+              break
+            fi
+            seed_command=$(grep -o 'sudo python3 .*make-macos-data-seed\.py .*' /tmp/unixnu-build.log | head -n 1)
+            if [ -n "$seed_command" ]; then
+              echo 'the driver asked for a first-install Data seed; running:'
+              echo "  $seed_command"
+              eval "$seed_command"
+              continue
+            fi
+            if grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
+              echo 'generating the signed root policies the repository does not ship:'
+              policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
+              export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
+              echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
+              continue
+            fi
+            break
+          done
+          exit 1
 
       - uses: actions/cache/save@v4
         if: always() && inputs.os == '27' && steps.data-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr') != ''
