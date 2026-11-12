@@ -167,6 +167,7 @@ jobs:
           path: ipsw-cache
           key: ${{ steps.ipsw-key.outputs.key }}
       - name: materialize cached IPSW members
+      timeout-minutes: 6
         run: |
           if [ -d ipsw-cache ]; then
             mkdir -p UniXNU/out/ipsw
@@ -485,6 +486,7 @@ jobs:
           if-no-files-found: warn
           path: ${{ runner.temp }}/build-logs/*.log
       - name: stage IPSW members for the cache
+      timeout-minutes: 6
         if: always()
         run: |
           rm -rf ipsw-cache
@@ -502,6 +504,7 @@ jobs:
           path: ipsw-cache
           key: ${{ steps.ipsw-key.outputs.key }}
       - name: disk usage
+      timeout-minutes: 3
         if: always()
         run: du -sh UniXNU/out/ipsw UniXNU/out/sheng device/.cache 2>/dev/null || true
       - uses: actions/cache/save@v4
