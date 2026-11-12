@@ -329,7 +329,7 @@ jobs:
           rm -rf "$RUNNER_TEMP/ipsw-cache" || true
           echo 'after freeing the IPSW cache:'
           df -h "$GITHUB_WORKSPACE" || true
-          python3 .github/scripts/split_userdata.py --chunk-mib 2048 --delete-source \
+          python3 device/.github/scripts/split_userdata.py --chunk-mib 2048 --delete-source \
             UniXNU/out/sheng/*/*/userdata/userdata-root.img
           ls -lh UniXNU/out/sheng/*/*/userdata/ | head -24
       - name: userdata artifact part 000
