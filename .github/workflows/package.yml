@@ -194,12 +194,13 @@ jobs:
           set -e
           f=drivers/ShengUfs/RootLayout.h
           test -f "$f" || { echo "missing $f"; exit 1; }
-          if grep -q 'wanted\[\] = "linux";' "$f"; then
+          if grep -q 'wanted\[\] = "linux"' "$f"; then
             echo 'already retargeted'
           else
-            sed -i 's/wanted\[\] = "userdata";/wanted[] = "linux";/' "$f"
+            perl -pi -e 's/wanted\[\] = "userdata";/wanted[] = "linux";/' "$f"
           fi
           grep -n 'static const char wanted' "$f"
+          grep -q 'wanted\[\] = "linux";' "$f" || { echo 'the retarget did not take'; exit 1; }
       - name: widen the adreno bridge build timeout
         run: |
           python3 - <<'PY'
