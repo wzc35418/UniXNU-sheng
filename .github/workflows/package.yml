@@ -310,16 +310,91 @@ jobs:
         run: |
           ./UniXNU/unixnu build userdata
           df -h "$GITHUB_WORKSPACE"
-      - name: userdata artifact
+      - name: split the userdata image below the artifact limit
+        if: inputs.build_userdata && success()
+        run: |
+          python3 .github/scripts/split_userdata.py --chunk-mib 3072 UniXNU/out/sheng/*/*/userdata/userdata-root.img
+          ls -lh UniXNU/out/sheng/*/*/userdata/ | head -20
+      - name: userdata artifact part 000
         if: inputs.build_userdata && success()
         uses: actions/upload-artifact@v4
         with:
-          name: userdata-${{ inputs.os }}
+          name: userdata-${{ inputs.os }}-000
           retention-days: 1
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
-            UniXNU/out/sheng/*/*/userdata/userdata-root.img
-            UniXNU/out/sheng/*/*/userdata/userdata-root.json
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.000
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 001
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-001
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.001
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 002
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-002
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.002
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 003
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-003
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.003
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 004
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-004
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.004
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 005
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-005
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.005
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 006
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-006
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.006
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 007
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-007
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.007
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
       - name: build logs
         if: always()
         env:
