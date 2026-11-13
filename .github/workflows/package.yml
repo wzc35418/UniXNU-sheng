@@ -181,7 +181,7 @@ jobs:
         env:
           OS_PROFILE: ${{ inputs.os }}
         run: |
-          echo "key=seed-v2-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
+          echo "key=seed-v3-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         id: macos-seed-cache
         with:
@@ -261,6 +261,9 @@ jobs:
             fi
             seed_command=$(grep -o 'sudo python3 .*make-macos-data-seed\.py .*' /tmp/unixnu-build.log | head -n 1)
             if [ -n "$seed_command" ]; then
+              # A seed without a user leaves loginwindow with an empty account list: a black screen
+              # with a cursor while every service keeps running. Create an account and auto-login.
+              seed_command="$seed_command --user unixnu:unixnu --auto-login"
               echo 'the driver asked for a first-install Data seed; running:'
               echo "  $seed_command"
               eval "$seed_command"
