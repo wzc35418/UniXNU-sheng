@@ -270,6 +270,8 @@ jobs:
               echo 'extracting the cryptex images so every window can be signed:'
               ../UniXNU/unixnu ipsw fetch --os "$OS_PROFILE" "Cryptex1,SystemOS" "Cryptex1,AppOS" || \
                 echo 'cryptex extraction failed; the policy step will report what is missing'
+              python3 .github/scripts/decrypt_aea.py || \
+                echo 'AEA decryption failed; the policy step will report what is missing'
               echo 'generating the signed root policies the repository does not ship:'
               policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
               export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
