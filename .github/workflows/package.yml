@@ -197,7 +197,7 @@ jobs:
           OS_PROFILE: ${{ inputs.os }}
         run: |
           set -e
-          ./UniXNU/unixnu --os "$OS_PROFILE" ipsw "Cryptex1,SystemOS" "Cryptex1,AppOS"
+          ./UniXNU/unixnu ipsw --os "$OS_PROFILE" "Cryptex1,SystemOS" "Cryptex1,AppOS"
           ls -la UniXNU/out/ipsw/*/ 2>/dev/null | head -20 || true
       - name: point the UFS root window at the macOS partition
         working-directory: device
