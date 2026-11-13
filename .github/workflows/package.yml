@@ -189,6 +189,16 @@ jobs:
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
           key: ${{ steps.macos-seed-key.outputs.key }}
+      - name: extract the cryptex images for the root policies
+        if: inputs.os == 'macos-27.3-26C5035r'
+        env:
+          UNIXNU_DEVICE: ${{ github.workspace }}/device
+          GITHUB_TOKEN: ${{ github.token }}
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          set -e
+          ./UniXNU/unixnu --os "$OS_PROFILE" ipsw "Cryptex1,SystemOS" "Cryptex1,AppOS"
+          ls -la UniXNU/out/ipsw/*/ 2>/dev/null | head -20 || true
       - name: point the UFS root window at the macOS partition
         working-directory: device
         run: |
