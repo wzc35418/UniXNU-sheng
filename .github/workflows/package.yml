@@ -189,16 +189,6 @@ jobs:
             UniXNU/out/sheng/*/*/runtime/data.dbr
             UniXNU/out/sheng/*/*/runtime/inputs.json
           key: ${{ steps.macos-seed-key.outputs.key }}
-      - name: extract the cryptex images for the root policies
-        if: inputs.os == 'macos-27.3-26C5035r'
-        env:
-          UNIXNU_DEVICE: ${{ github.workspace }}/device
-          GITHUB_TOKEN: ${{ github.token }}
-          OS_PROFILE: ${{ inputs.os }}
-        run: |
-          set -e
-          ./UniXNU/unixnu ipsw fetch --os "$OS_PROFILE" "Cryptex1,SystemOS" "Cryptex1,AppOS"
-          ls -la UniXNU/out/ipsw/*/ 2>/dev/null | head -20 || true
       - name: point the UFS root window at the macOS partition
         working-directory: device
         run: |
@@ -277,6 +267,9 @@ jobs:
               continue
             fi
             if grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
+              echo 'extracting the cryptex images so every window can be signed:'
+              ../UniXNU/unixnu ipsw fetch --os "$OS_PROFILE" "Cryptex1,SystemOS" "Cryptex1,AppOS" || \
+                echo 'cryptex extraction failed; the policy step will report what is missing'
               echo 'generating the signed root policies the repository does not ship:'
               policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
               export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
