@@ -266,43 +266,332 @@ jobs:
               seed_command="$seed_command --user unixnu:unixnu --auto-login --keyboard-type 0-0-0=40 --keyboard-type 1-0-0=40 --keyboard-type 0-1-0=40"
               echo 'the driver asked for a first-install Data seed; running:'
               echo "  $seed_command"
-              echo "  $seed_command"
               # Give a fresh Data volume a Dock: patch the seed script where it lives so its own ROOT
               # (the tree) keeps resolving the modules and helper scripts beside it.
               python3 - <<'PY'
-              import pathlib
+          import pathlib
 
-              DOCK = '''def add_dock_defaults(mount, name, uid=501, gid=20):
-                  """The Dock a fresh user needs; loginwindow alone leaves it without tiles."""
-                  apps = [('Finder', '/System/Library/CoreServices/Finder.app'),
-                          ('Safari', '/Applications/Safari.app'),
-                          ('System Settings', '/System/Applications/System Settings.app'),
-                          ('Terminal', '/System/Applications/Utilities/Terminal.app')]
-                  tiles = []
-                  for label, path in apps:
-                      url = 'file://' + path.replace(' ', '%20') + '/'
-                      tiles.append({'tile-type': 'file-tile',
-                                    'tile-data': {'file-label': label,
-                                                  'file-data': {'_CFURLString': url, '_CFURLStringType': 15}}})
-                  prefs = {'autohide': False, 'orientation': 'bottom', 'tilesize': 48,
-                           'mineffect': 'genie', 'show-process-indicators': True,
-                           'persistent-apps': tiles}
-                  target = mount / 'Users' / name / 'Library/Preferences/com.apple.dock.plist'
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  write_root(target, plistlib.dumps(prefs, fmt=plistlib.FMT_BINARY), 0o644)
+          DOCK = '''def add_dock_defaults(mount, name, uid=501, gid=20):
+              """The Dock a fresh user needs; loginwindow alone leaves it without tiles."""
+              apps = [('Finder', '/System/Library/CoreServices/Finder.app'),
+                      ('Safari', '/Applications/Safari.app'),
+                      ('System Settings', '/System/Applications/System Settings.app'),
+                      ('Terminal', '/System/Applications/Utilities/Terminal.app')]
+              tiles = []
+              for label, path in apps:
+                  url = 'file://' + path.replace(' ', '%20') + '/'
+                  tiles.append({'tile-type': 'file-tile',
+                                'tile-data': {'file-label': label,
+                                              'file-data': {'_CFURLString': url, '_CFURLStringType': 15}}})
+              prefs = {'autohide': False, 'orientation': 'bottom', 'tilesize': 48,
+                       'mineffect': 'genie', 'show-process-indicators': True,
+                       'persistent-apps': tiles}
+              target = mount / 'Users' / name / 'Library/Preferences/com.apple.dock.plist'
+              target.parent.mkdir(parents=True, exist_ok=True)
+              write_root(target, plistlib.dumps(prefs, fmt=plistlib.FMT_BINARY), 0o644)
 
 
-              '''
-              for path in pathlib.Path('../UniXNU/out/sheng').glob('*/*/tree/scripts/make-macos-data-seed.py'):
-                  text = path.read_text()
-                  if 'add_dock_defaults' in text:
-                      continue
-                  text = text.replace('def add_home(', DOCK + 'def add_home(', 1)
-                  text = text.replace("add_home(template, scratch, args.user.split(':', 1)[0])",
-                                      "user_name = args.user.split(':', 1)[0]\n                add_home(template, scratch, user_name)\n                add_dock_defaults(scratch, user_name)", 1)
-                  path.write_text(text)
-                  print('patched', path)
-              PY
+          '''
+          for path in pathlib.Path('../UniXNU/out/sheng').glob('*/*/tree/scripts/make-macos-data-seed.py'):
+              text = path.read_text()
+              if 'add_dock_defaults' in text:
+                  continue
+              text = text.replace('def add_home(', DOCK + 'def add_home(', 1)
+              text = text.replace("add_home(template, scratch, args.user.split(':', 1)[0])",
+                                  "user_name = args.user.split(':', 1)[0]\n                add_home(template, scratch, user_name)\n                add_dock_defaults(scratch, user_name)", 1)
+              path.write_text(text)
+              print('patched', path)
+          PY
+              eval "$seed_command"
+              continue
+            fi
+            if grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
+              echo 'extracting the cryptex images so every window can be signed:'
+              ../UniXNU/unixnu ipsw fetch --os "$OS_PROFILE" "Cryptex1,SystemOS" "Cryptex1,AppOS" || \
+                echo 'cryptex extraction failed; the policy step will report what is missing'
+              python3 .github/scripts/decrypt_aea.py || \
+                echo 'AEA decryption failed; the policy step will report what is missing'
+              echo 'generating the signed root policies the repository does not ship:'
+              policy_env=$(python3 .github/scripts/gen_root_policies.py /tmp/unixnu-build.log | tail -n 1)
+              export UNIXNU_SOURCE_STORAGE_POLICIES="${policy_env}"
+              echo "selected policies: ${UNIXNU_SOURCE_STORAGE_POLICIES}"
+              continue
+            fi
+            break
+          done
+          exit 1
+
+      - uses: actions/cache/save@v4
+        if: always() && inputs.os == '27' && steps.data-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr') != ''
+        with:
+          path: |
+            UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr
+            UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/inputs.json
+          key: ${{ steps.seed-key.outputs.key }}-${{ inputs.os }}
+      - name: installation seed backup
+        if: always() && inputs.os == '27' && hashFiles('UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: installation-seed-${{ inputs.os }}
+          retention-days: 1
+          path: |
+            UniXNU/out/sheng/*/*/runtime/data.dbr
+            UniXNU/out/sheng/*/*/runtime/inputs.json
+      - name: images
+        uses: actions/upload-artifact@v4
+        with:
+          name: images-${{ inputs.os }}
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            UniXNU/out/sheng/*/*/boot/boot.img
+            UniXNU/out/sheng/*/*/payload/payload.img
+            UniXNU/out/sheng/*/*/kernel/kernel.macho
+            UniXNU/out/sheng/*/*/package.manifest.json
+      - name: userdata layout
+        if: inputs.build_userdata && success()
+        env:
+          UNIXNU_DEVICE: ${{ github.workspace }}/device
+          GITHUB_TOKEN: ${{ github.token }}
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          set -e
+          tree=$(ls -d UniXNU/out/sheng/"$OS_PROFILE"/*/tree | head -n 1)
+          echo "tree: $tree"
+          args=(--os "$OS_PROFILE")
+          for window in OS SystemOS App; do
+            table="$tree/build/verified-root-$window/hashes.bin"
+            if [ -f "$table" ]; then
+              echo "object $window.vroot <- $table ($(stat -f%z "$table") bytes)"
+              args+=(--object "$window.vroot=$table")
+            fi
+          done
+          ./UniXNU/unixnu build userdata "${args[@]}" --dry-run
+          df -h "$GITHUB_WORKSPACE"
+      - name: userdata image
+        if: inputs.build_userdata && success()
+        env:
+          UNIXNU_DEVICE: ${{ github.workspace }}/device
+          GITHUB_TOKEN: ${{ github.token }}
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          set -e
+          tree=$(ls -d UniXNU/out/sheng/"$OS_PROFILE"/*/tree | head -n 1)
+          args=(--os "$OS_PROFILE")
+          for window in OS SystemOS App; do
+            table="$tree/build/verified-root-$window/hashes.bin"
+            if [ -f "$table" ]; then
+              args+=(--object "$window.vroot=$table")
+            fi
+          done
+          ./UniXNU/unixnu build userdata "${args[@]}"
+          df -h "$GITHUB_WORKSPACE"
+      - name: split the userdata image below the artifact limit
+        if: inputs.build_userdata && success()
+        run: |
+          set -e
+          df -h "$GITHUB_WORKSPACE" || true
+          rm -rf UniXNU/out/ipsw
+          rm -rf "$RUNNER_TEMP/ipsw-cache" || true
+          echo 'after freeing the IPSW cache:'
+          df -h "$GITHUB_WORKSPACE" || true
+          python3 device/.github/scripts/split_userdata.py --chunk-mib 2048 --delete-source \
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img
+          ls -lh UniXNU/out/sheng/*/*/userdata/ | head -24
+      - name: userdata artifact part 000
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-000
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.000
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+            UniXNU/out/sheng/*/*/userdata/userdata-root.json
+      - name: userdata artifact part 001
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-001
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.001
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 002
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-002
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.002
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 003
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-003
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.003
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 004
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-004
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.004
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 005
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-005
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.005
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 006
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-006
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.006
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 007
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-007
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.007
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 008
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-008
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.008
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 009
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-009
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.009
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 010
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-010
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.010
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: userdata artifact part 011
+        if: inputs.build_userdata && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}-011
+          retention-days: 1
+          if-no-files-found: ignore
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.011
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img.parts.json
+      - name: build logs
+        if: always()
+        env:
+          SEED: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, shutil
+          root = pathlib.Path('UniXNU/out/sheng')
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'build-logs'
+          shutil.rmtree(dest, ignore_errors=True)
+          dest.mkdir(parents=True, exist_ok=True)
+          seed = os.environ.get('SEED') or ''
+          count = 0
+          for path in sorted(root.glob('*/*/logs/*.log')) if root.is_dir() else []:
+              data = path.read_bytes()
+              if b'\0' in data:
+                  continue
+              text = data.decode('utf-8', 'replace')
+              if seed:
+                  text = text.replace(seed, '***')
+              text = re.sub(r'https?://[^\s"\']*[?&](?:token|sig|signature|key|X-Amz-Signature)=[^\s"\']*', '***', text, flags=re.I)
+              (dest / path.name).write_text(text, encoding='utf-8')
+              count += 1
+          print(f'{count} text logs staged from {root}')
+          PY
+      - name: build logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ inputs.os }}
+          retention-days: 3
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/build-logs/*.log
+      - name: stage IPSW members for the cache
+        timeout-minutes: 6
+        if: always()
+        run: |
+          rm -rf ipsw-cache
+          if [ -d UniXNU/out/ipsw ]; then
+            mkdir -p ipsw-cache
+            # 只留非 *.aea 成员：ipsw.py 支持解密后删掉 aea，凭明文镜像与记录即可跳过下载。
+            rsync -a --exclude '*.aea' --remove-source-files UniXNU/out/ipsw/ ipsw-cache/ \
+              || tar -C UniXNU/out/ipsw --exclude='*.aea' -cf - . | tar -C ipsw-cache -xf -
+            du -sh ipsw-cache || true
+          fi
+      - uses: actions/cache/save@v4
+        if: always() && steps.ipsw-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        with:
+          path: ipsw-cache
+          key: ${{ steps.ipsw-key.outputs.key }}
+      - name: disk usage
+        timeout-minutes: 3
+        if: always()
+        run: du -sh UniXNU/out/ipsw UniXNU/out/sheng device/.cache 2>/dev/null || true
+      - uses: actions/cache/save@v4
+        if: always() && steps.macos-seed-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/*/*/runtime/data.dbr') != ''
+        continue-on-error: true
+        with:
+          path: |
+            UniXNU/out/sheng/*/*/runtime/data.dbr
+            UniXNU/out/sheng/*/*/runtime/inputs.json
+          key: ${{ steps.macos-seed-key.outputs.key }}
+      - uses: actions/cache/save@v4
+        if: always() && steps.cargo-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            UniXNU/out/sheng/*/*/tree/build/adreno-metal-bridge/target
+          key: ${{ steps.cargo-key.outputs.key }}
+
               eval "$seed_command"
               continue
             fi
