@@ -181,7 +181,7 @@ jobs:
         env:
           OS_PROFILE: ${{ inputs.os }}
         run: |
-          echo "key=seed-v4-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
+          echo "key=seed-v5-${OS_PROFILE}" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         id: macos-seed-cache
         with:
@@ -266,7 +266,9 @@ jobs:
               seed_command="$seed_command --user unixnu:unixnu --auto-login --keyboard-type 0-0-0=40 --keyboard-type 1-0-0=40 --keyboard-type 0-1-0=40"
               echo 'the driver asked for a first-install Data seed; running:'
               echo "  $seed_command"
-              eval "$seed_command"
+              seed_command=$(printf %s "$seed_command" | sed -E 's#python3 [^ ]*make-macos-data-seed\.py#python3 "$PWD/.github/scripts/make-macos-data-seed.py"#')
+                echo "  $seed_command"
+                eval "$seed_command"
               continue
             fi
             if grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
