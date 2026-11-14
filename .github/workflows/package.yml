@@ -266,9 +266,44 @@ jobs:
               seed_command="$seed_command --user unixnu:unixnu --auto-login --keyboard-type 0-0-0=40 --keyboard-type 1-0-0=40 --keyboard-type 0-1-0=40"
               echo 'the driver asked for a first-install Data seed; running:'
               echo "  $seed_command"
-              seed_command=$(printf %s "$seed_command" | sed -E 's#python3 ([^ ]*)/scripts/make-macos-data-seed\.py#env PYTHONPATH=\1/drivers/DarwinBoot/Test python3 "$PWD/.github/scripts/make-macos-data-seed.py"#')
-                echo "  $seed_command"
-                eval "$seed_command"
+              echo "  $seed_command"
+              # Give a fresh Data volume a Dock: patch the seed script where it lives so its own ROOT
+              # (the tree) keeps resolving the modules and helper scripts beside it.
+              python3 - <<'PY'
+              import pathlib
+
+              DOCK = '''def add_dock_defaults(mount, name, uid=501, gid=20):
+                  """The Dock a fresh user needs; loginwindow alone leaves it without tiles."""
+                  apps = [('Finder', '/System/Library/CoreServices/Finder.app'),
+                          ('Safari', '/Applications/Safari.app'),
+                          ('System Settings', '/System/Applications/System Settings.app'),
+                          ('Terminal', '/System/Applications/Utilities/Terminal.app')]
+                  tiles = []
+                  for label, path in apps:
+                      url = 'file://' + path.replace(' ', '%20') + '/'
+                      tiles.append({'tile-type': 'file-tile',
+                                    'tile-data': {'file-label': label,
+                                                  'file-data': {'_CFURLString': url, '_CFURLStringType': 15}}})
+                  prefs = {'autohide': False, 'orientation': 'bottom', 'tilesize': 48,
+                           'mineffect': 'genie', 'show-process-indicators': True,
+                           'persistent-apps': tiles}
+                  target = mount / 'Users' / name / 'Library/Preferences/com.apple.dock.plist'
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  write_root(target, plistlib.dumps(prefs, fmt=plistlib.FMT_BINARY), 0o644)
+
+
+              '''
+              for path in pathlib.Path('../UniXNU/out/sheng').glob('*/*/tree/scripts/make-macos-data-seed.py'):
+                  text = path.read_text()
+                  if 'add_dock_defaults' in text:
+                      continue
+                  text = text.replace('def add_home(', DOCK + 'def add_home(', 1)
+                  text = text.replace("add_home(template, scratch, args.user.split(':', 1)[0])",
+                                      "user_name = args.user.split(':', 1)[0]\n                add_home(template, scratch, user_name)\n                add_dock_defaults(scratch, user_name)", 1)
+                  path.write_text(text)
+                  print('patched', path)
+              PY
+              eval "$seed_command"
               continue
             fi
             if grep -q 'policies/.*/trusted-key\.bin' /tmp/unixnu-build.log; then
