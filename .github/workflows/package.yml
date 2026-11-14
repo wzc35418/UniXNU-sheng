@@ -266,7 +266,7 @@ jobs:
               seed_command="$seed_command --user unixnu:unixnu --auto-login --keyboard-type 0-0-0=40 --keyboard-type 1-0-0=40 --keyboard-type 0-1-0=40"
               echo 'the driver asked for a first-install Data seed; running:'
               echo "  $seed_command"
-              seed_command=$(printf %s "$seed_command" | sed -E 's#python3 ([^ ]*)/scripts/make-macos-data-seed\.py#env PYTHONPATH=\1/scripts python3 "$PWD/.github/scripts/make-macos-data-seed.py"#')
+              seed_command=$(printf %s "$seed_command" | sed -E 's#python3 ([^ ]*)/scripts/make-macos-data-seed\.py#env PYTHONPATH=\1/drivers/DarwinBoot/Test python3 "$PWD/.github/scripts/make-macos-data-seed.py"#')
                 echo "  $seed_command"
                 eval "$seed_command"
               continue
