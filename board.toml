@@ -273,6 +273,9 @@ CI_ENABLE_METAL_GPU = "0"
 # The audio server plug-in as a macOS driver bundle in /Library/Audio/Plug-Ins/HAL (Library/ files of the addon).
 "audio_target" = "arm64e-apple-macos27.0"
 # The WiFi supplicant runs from /private/var/ngpu/bin; its job is a plist of /Library/LaunchDaemons (no launchd cache merge).
+# The addon carries the service alone: the kernel reads the three binaries from the board's storage archive at 18 GiB of
+# the linux partition, so neither this payload nor the Data volume has to hold their 8.82 MiB.
+"wifi_tool" = "scripts/build-wifi-userspace.py"
 "wifi_target" = "macos27"
 # Bluetooth: the patched daemon and BlueTool in the addon's sbin (shown over /usr/sbin), the capability library in its lib.
 "bluetooth_target" = "macos27"
