@@ -27,32 +27,27 @@ firmware_prefix = re.search(r'^#define SHENG_WIFI_FIRMWARE_PREFIX "([^"]+)"$',
     (root / "package/WifiFirmware.h").read_text(), re.M).group(1)
 firmware_source = root / "firmware/wcn7850"
 firmware_manifest = json.loads((firmware_source / "manifest.json").read_text())["files"]
-if not {'amss.bin', 'm3.bin', 'board-2.bin'} <= firmware_manifest.keys():
-    raise SystemExit("missing required WCN7850 firmware inputs")
+required_firmware = ('amss.bin', 'm3.bin', 'board-2.bin')
+missing_firmware = [name for name in required_firmware if not (firmware_source / name).is_file()]
 shutil.rmtree(out / 'firmware', ignore_errors=True)
 (out / 'firmware').mkdir()
-missing_firmware = []
-for name, expected in firmware_manifest.items():
-    if name not in ('amss.bin', 'amss2.bin', 'm3.bin', 'board-2.bin'):
-        raise SystemExit("unsupported WCN7850 firmware name")
-    source = firmware_source / name
-    # The firmware blobs are device inputs, not repository contents. A build host
-    # without them still produces the addon; the wireless runtime then reports the
-    # missing blob instead of failing the whole package.
-    if not source.is_file():
-        missing_firmware.append(name)
-        continue
-    data = source.read_bytes()
-    if len(data) != expected['bytes'] or hashlib.sha256(data).hexdigest() != expected['sha256']:
-        raise SystemExit("WCN7850 firmware differs from manifest: " + name)
-    (out / 'firmware' / name).write_bytes(data)
+staged_firmware = []
 if missing_firmware:
-    print("wifi: firmware blobs absent, skipped the addon: " + ", ".join(sorted(missing_firmware)))
-    for name in ("bin", "etc/wifi", "daemons"):
-        (out / name).mkdir(parents=True, exist_ok=True)
-    (out / "report.json").write_text(json.dumps(
-        {"skipped": "device firmware blobs absent", "missing": sorted(missing_firmware)}, indent=2) + "\n")
-    sys.exit(0)
+    # The binaries stay local (firmware/README.md). Without them the addon carries the service alone and
+    # the kernel reads them from the board's storage archive (package/WifiFirmware.c).
+    print("WCN7850 firmware not staged (" + ", ".join(missing_firmware) +
+          "); the kernel reads it from the board's storage archive", file=sys.stderr)
+else:
+    if not set(required_firmware) <= firmware_manifest.keys():
+        raise SystemExit("missing required WCN7850 firmware inputs")
+    for name, expected in firmware_manifest.items():
+        if name not in ('amss.bin', 'amss2.bin', 'm3.bin', 'board-2.bin'):
+            raise SystemExit("unsupported WCN7850 firmware name")
+        data = (firmware_source / name).read_bytes()
+        if len(data) != expected['bytes'] or hashlib.sha256(data).hexdigest() != expected['sha256']:
+            raise SystemExit("WCN7850 firmware differs from manifest: " + name)
+        (out / 'firmware' / name).write_bytes(data)
+        staged_firmware.append(name)
 # Unattended testing only: UNIXNU_WIFI_JOIN names a local file (network name on the first line, key on the second) that goes to the
 # firmware directory as join.txt; with the kernel argument wifi-aj=1 the board joins that network by itself (WifiNet.cpp autoJoin).
 # Never set for a release: the file holds a network key.
@@ -87,7 +82,7 @@ job = {"Label": "org.unixnu.wifi.supplicant", "ProgramArguments": [
 (out / "daemons/org.unixnu.wifi.supplicant.plist").write_bytes(plistlib.dumps(job))
 files = [path for name in ("bin", "etc/wifi", "daemons", "firmware") for path in sorted((out / name).rglob("*")) if path.is_file()]
 (out / "report.json").write_text(json.dumps({"built": True, "target": args.target,
-    "cdhash": match[1], "hardware_verified": False, "firmware_prefix": firmware_prefix,
+    "cdhash": match[1], "hardware_verified": False, "firmware_prefix": firmware_prefix, "firmware_staged": staged_firmware,
     "daemons_prefix": "Library/LaunchDaemons" if macos else "daemons",
     "files": {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest() for path in files},
     "supplicant": json.loads((component / f"out/wpa-{supplicant_target}/report.json").read_text())}, indent=2) + "\n")
