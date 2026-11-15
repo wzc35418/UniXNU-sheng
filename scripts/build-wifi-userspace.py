@@ -56,6 +56,9 @@ if join:
     (out / 'firmware' / 'join.txt').write_bytes(Path(join).read_bytes())
 macos = args.target == "macos27"
 supplicant_target = "macos" if macos else "ios"
+# The component keeps its wpa_supplicant and cfg80211 sources out of the repository: fetch them when they are
+# absent (fetch-sources.py returns at once while the locked checkouts already match).
+subprocess.run([sys.executable, component / "tools/fetch-sources.py"], check=True)
 subprocess.run([sys.executable, component / "tools/build-supplicant.py", "--target", supplicant_target], check=True)
 for name in ("bin", "etc/wifi", "daemons"):
     (out / name).mkdir(parents=True, exist_ok=True)
