@@ -58,6 +58,32 @@ macos = args.target == "macos27"
 supplicant_target = "macos" if macos else "ios"
 # The component keeps its wpa_supplicant and cfg80211 sources out of the repository: fetch them when they are
 # absent (fetch-sources.py returns at once while the locked checkouts already match).
+
+def place_locked_checkout() -> None:
+    """Place the locked FreeBSD commit before fetch-sources.py runs.
+
+    freebsd's releng/15.1 moved past the commit the source lock pins, so a fresh clone fails the
+    identity check. Fetching the locked commit here leaves fetch-sources.py with a checkout it can
+    validate, its own sparse-checkout step then completing the import."""
+    import json
+    import subprocess
+    from pathlib import Path
+    lock = json.loads((component / "tools/source-lock.json").read_text()).get("freebsd") or {}
+    commit, url = lock.get("commit"), lock.get("url")
+    target = component / "deps" / "freebsd"
+    if not commit or not url or target.exists():
+        return
+    paths = [path.lstrip("/") for path in lock.get("paths", [])]
+    subprocess.run(["git", "init", "-q", str(target)], check=True)
+    subprocess.run(["git", "-C", str(target), "remote", "add", "origin", url], check=True)
+    subprocess.run(["git", "-C", str(target), "fetch", "-q", "--depth", "1", "origin", commit], check=True)
+    subprocess.run(["git", "-C", str(target), "checkout", "-q", "-f", commit], check=True)
+    if paths:
+        subprocess.run(["git", "-C", str(target), "sparse-checkout", "init", "--cone"], check=True)
+        subprocess.run(["git", "-C", str(target), "sparse-checkout", "set", *paths], check=True)
+
+
+place_locked_checkout()
 subprocess.run([sys.executable, component / "tools/fetch-sources.py"], check=True)
 subprocess.run([sys.executable, component / "tools/build-supplicant.py", "--target", supplicant_target], check=True)
 for name in ("bin", "etc/wifi", "daemons"):
